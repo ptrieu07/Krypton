@@ -1,4 +1,4 @@
--- Krypton v0.01 | Final Functional Fix (ZIndex & Click Event Rectified)
+-- Krypton v0.1 | Final Functional Fix (ZIndex & Click Event Rectified)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
