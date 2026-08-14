@@ -1,4 +1,4 @@
--- KRYPTON - COMBINED ESP (CENTER TRACER), FLY & REJOIN / SERVER HOP
+-- KRYPTON - ENGLISH VERSION & TELEPORT TAB WITH PLAYER LIST
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -10,7 +10,7 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Auto GUI Parent Compatibility
+-- Safe GUI Parent detection
 local TargetParent = LocalPlayer:WaitForChild("PlayerGui")
 pcall(function()
     if gethui then
@@ -30,14 +30,14 @@ end
 
 local Config = {
     Speed = 16, Jump = 50, Fly = false, FlySpeed = 50,
-    Noclip = false, Spin2D = false, Spin3D = false, SpinSpeed = 10,
+    Noclip = false, Spin2D = false, Spin3D = false, SpinSpeed = 20,
     AntiFling = false, ClickTP = false, AutoTeleport = false, AutoTarget = "",
     
     -- AIMBOT CONFIG
     Aimbot = true, 
     AimPart = "HumanoidRootPart", 
-    Smoothness = 1,              -- MẶC ĐỊNH 1
-    FOVSize = 30,                -- MẶC ĐỊNH 30
+    Smoothness = 1,              
+    FOVSize = 30,                
     ShowFOV = true,
     HoldRightClickToAim = true,
     
@@ -86,11 +86,11 @@ local function GetPlayerRoleColor(player)
     scanTools(backpack)
 
     if isMurderer then
-        return Color3.fromRGB(255, 30, 30), "Murderer"       -- ĐỎ
+        return Color3.fromRGB(255, 30, 30), "Murderer"
     elseif isSheriff then
-        return Color3.fromRGB(0, 150, 255), "Sheriff"        -- XANH DƯƠNG
+        return Color3.fromRGB(0, 150, 255), "Sheriff"
     else
-        return Color3.fromRGB(0, 255, 120), "Innocent"       -- XANH LÁ
+        return Color3.fromRGB(0, 255, 120), "Innocent"
     end
 end
 
@@ -138,6 +138,7 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KryptonMain"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.Enabled = true
 ScreenGui.Parent = TargetParent
 
 local MainFrame = Instance.new("Frame", ScreenGui)
@@ -295,9 +296,9 @@ end
 
 -- --- REJOIN & SERVER HOP FUNCTIONS ---
 local function RejoinServer()
-    AddLog("INFO", "Đang kết nối lại server cũ...")
+    AddLog("INFO", "Reconnecting to old server...")
     if #Players:GetPlayers() <= 1 then
-        LocalPlayer:Kick("\n[Krypton] Đang Rejoin...")
+        LocalPlayer:Kick("\n[Krypton] Rejoining...")
         task.wait(0.5)
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     else
@@ -306,7 +307,7 @@ local function RejoinServer()
 end
 
 local function ServerHop()
-    AddLog("INFO", "Đang tìm Server khác...")
+    AddLog("INFO", "Finding another server...")
     local success, result = pcall(function()
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
     end)
@@ -323,10 +324,10 @@ local function ServerHop()
             local randomServer = servers[math.random(1, #servers)]
             TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, LocalPlayer)
         else
-            AddLog("ERROR", "Không tìm thấy Server thích hợp!")
+            AddLog("ERROR", "No suitable server found!")
         end
     else
-        AddLog("ERROR", "Thất bại khi lấy danh sách Server!")
+        AddLog("ERROR", "Failed to fetch server list!")
     end
 end
 
@@ -334,8 +335,8 @@ end
 local tabPanels = {}
 local function createTab(name, index)
     local btn = Instance.new("TextButton", Sidebar)
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.Position = UDim2.new(0, 0, 0, (index-1)*40)
+    btn.Size = UDim2.new(1, 0, 0, 32)
+    btn.Position = UDim2.new(0, 0, 0, (index-1)*36)
     btn.Text = name
     btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     btn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -427,20 +428,87 @@ local function addSlider(tab, label, key, min, max, isFloat, callback)
     end)
 end
 
--- --- CREATING TABS ---
-createTab("Combat", 1)
-createTab("Player", 2)
-createTab("Teleport", 3)
-createTab("Visual", 4)
+-- --- PLAYER TELEPORT DROPDOWN WIDGET ---
+local function addPlayerTeleporter(tab)
+    local f = Instance.new("Frame", tabPanels[tab]); f.Size = UDim2.new(1, 0, 0, 32); f.BackgroundTransparency = 1
+    local btn = Instance.new("TextButton", f)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Text = "Player Teleport List [Closed]"
+    btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Instance.new("UICorner", btn)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(50, 50, 50)
+    
+    local listFrame = Instance.new("ScrollingFrame", tabPanels[tab])
+    listFrame.Size = UDim2.new(1, 0, 0, 130)
+    listFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    listFrame.BorderSizePixel = 0
+    listFrame.Visible = false
+    listFrame.ScrollBarThickness = 2
+    Instance.new("UICorner", listFrame)
+    local listLayout = Instance.new("UIListLayout", listFrame)
+    listLayout.Padding = UDim.new(0, 3)
+    
+    local isOpen = false
+    
+    local function refreshList()
+        for _, child in pairs(listFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+        
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local pBtn = Instance.new("TextButton", listFrame)
+                pBtn.Size = UDim2.new(1, 0, 0, 28)
+                pBtn.Text = "  > " .. player.DisplayName .. " (@" .. player.Name .. ")"
+                pBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+                pBtn.Font = Enum.Font.Gotham
+                pBtn.TextSize = 12
+                pBtn.TextXAlignment = Enum.TextXAlignment.Left
+                pBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                Instance.new("UICorner", pBtn)
+                
+                pBtn.MouseButton1Click:Connect(function()
+                    pcall(function()
+                        local targetChar = player.Character
+                        local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                        local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if targetHrp and myHrp then
+                            myHrp.CFrame = targetHrp.CFrame + Vector3.new(0, 3, 0)
+                            AddLog("SUCCESS", "Teleported to " .. player.DisplayName)
+                        else
+                            AddLog("ERROR", "Target player is not available!")
+                        end
+                    end)
+                end)
+            end
+        end
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 5)
+    end
+    
+    btn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        listFrame.Visible = isOpen
+        btn.Text = isOpen and "Player Teleport List [Opened]" or "Player Teleport List [Closed]"
+        if isOpen then
+            refreshList()
+        end
+    end)
+end
 
--- --- TAB 1: COMBAT ---
-addSwitch("Combat", "Enable Aimbot", "Aimbot", function() end)
-addSwitch("Combat", "Hold Right-Click to Aim", "HoldRightClickToAim", function() end)
-addSwitch("Combat", "Show FOV Circle", "ShowFOV", function() end)
-addSlider("Combat", "FOV Size", "FOVSize", 10, 400, false, function() end)
-addSlider("Combat", "Lock Speed (Độ nhạy)", "Smoothness", 0.1, 1.0, true, function() end)
+-- --- CREATING TABS (ORDER: Player, Aim, Visual, Teleport, Server) ---
+createTab("Player", 1)
+createTab("Aim", 2)
+createTab("Visual", 3)
+createTab("Teleport", 4)
+createTab("Server", 5)
 
--- --- TAB 2: PLAYER FEATURES ---
+-- --- TAB 1: PLAYER ---
 addSlider("Player", "WalkSpeed", "Speed", 16, 250, false, function(v) pcall(function() LocalPlayer.Character.Humanoid.WalkSpeed = v end) end)
 addSlider("Player", "JumpPower", "Jump", 50, 500, false, function(v) pcall(function() LocalPlayer.Character.Humanoid.UseJumpPower = true; LocalPlayer.Character.Humanoid.JumpPower = v end) end)
 addSlider("Player", "Fly Speed", "FlySpeed", 10, 300, false, function() end)
@@ -461,17 +529,16 @@ addSwitch("Player", "Anti Fling", "AntiFling", function() end)
 addSwitch("Player", "Spin 2D", "Spin2D", function(v) if v then Config.Spin3D = false end end)
 addSwitch("Player", "Spin 3D", "Spin3D", function(v) if v then Config.Spin2D = false end end)
 
--- BỔ SUNG REJOIN VÀ SERVER HOP
-addButton("Player", "🔄 Rejoin Server", function() RejoinServer() end)
-addButton("Player", "🌐 Server Hop (Đổi Server)", function() ServerHop() end)
+-- --- TAB 2: AIM ---
+addSwitch("Aim", "Enable Aimbot", "Aimbot", function() end)
+addSwitch("Aim", "Hold Right-Click to Aim", "HoldRightClickToAim", function() end)
+addSwitch("Aim", "Show FOV Circle", "ShowFOV", function() end)
+addSlider("Aim", "FOV Size", "FOVSize", 10, 400, false, function() end)
+addSlider("Aim", "Smoothness", "Smoothness", 0.1, 1.0, true, function() end)
 
--- --- TAB 3: TELEPORT ---
-addSwitch("Teleport", "Click TP (Ctrl+LClick)", "ClickTP", function() end)
-addSwitch("Teleport", "Auto Above-Head TP", "AutoTeleport", function() end)
-
--- --- TAB 4: VISUAL FEATURES ---
+-- --- TAB 3: VISUAL ---
 addSlider("Visual", "Brightness", "Brightness", 0, 10, false, function(v) Lighting.Brightness = v end)
-addSwitch("Visual", "ESP Player", "PlayerESP", function() end)
+addSwitch("Visual", "Player ESP", "PlayerESP", function() end)
 addSwitch("Visual", "FPS Boost", "FPSBoost", function(v)
     if v then 
         for _, obj in pairs(workspace:GetDescendants()) do if obj:IsA("BasePart") then obj.Material = Enum.Material.SmoothPlastic end end
@@ -480,6 +547,15 @@ addSwitch("Visual", "FPS Boost", "FPSBoost", function(v)
         Lighting.GlobalShadows = true
     end
 end)
+
+-- --- TAB 4: TELEPORT ---
+addSwitch("Teleport", "Click TP (Ctrl+LClick)", "ClickTP", function() end)
+addSwitch("Teleport", "Auto Above-Head TP", "AutoTeleport", function() end)
+addPlayerTeleporter("Teleport")
+
+-- --- TAB 5: SERVER ---
+addButton("Server", "Rejoin Server", function() RejoinServer() end)
+addButton("Server", "Server Hop", function() ServerHop() end)
 
 -- --- AIMBOT ENGINE ---
 local function GetClosestTargetInFOV()
@@ -642,7 +718,7 @@ RunService.RenderStepped:Connect(function()
 
             local screenPos, onScreen = Camera:WorldToViewportPoint(data.HRP.Position)
 
-            -- TRACER (XUẤT PHÁT TỪ TÂM MÀN HÌNH)
+            -- TRACER
             if data.Tracer then
                 if onScreen then
                     data.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -705,7 +781,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
--- --- SPIN & SPEED ENFORCER ENGINE ---
+-- --- SPIN, SPEED & PHYSICS ENFORCER ENGINE ---
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -717,12 +793,27 @@ RunService.Heartbeat:Connect(function()
     end
 
     if hrp and hum then
+        -- SPIN ENGINE (BodyAngularVelocity with adjustable Speed slider)
+        local bav = hrp:FindFirstChild("KrySpinBav")
         if Config.Spin2D or Config.Spin3D then
             hum.AutoRotate = false
-            if Config.Spin2D then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed), 0) 
-            elseif Config.Spin3D then hrp.CFrame = hrp.CFrame * CFrame.Angles(math.rad(Config.SpinSpeed), math.rad(Config.SpinSpeed), math.rad(Config.SpinSpeed)) end
+            if not bav then
+                bav = Instance.new("BodyAngularVelocity")
+                bav.Name = "KrySpinBav"
+                bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bav.P = 12500
+                bav.Parent = hrp
+            end
+            
+            local speedMultiplier = Config.SpinSpeed * 5
+            if Config.Spin2D then
+                bav.AngularVelocity = Vector3.new(0, speedMultiplier, 0)
+            elseif Config.Spin3D then
+                bav.AngularVelocity = Vector3.new(speedMultiplier, speedMultiplier, speedMultiplier)
+            end
         else
             hum.AutoRotate = true
+            if bav then bav:Destroy() end
         end
 
         if Config.AntiFling and (hrp.AssemblyLinearVelocity.Magnitude > 100 or hrp.AssemblyAngularVelocity.Magnitude > 100) then
